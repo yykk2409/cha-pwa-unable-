@@ -99,4 +99,4 @@ app.get("/resetComments", (req, resp) => {
     resp.status(200).send();
 });
 
-server.listen(port, () => console.log(`Listening on port ${port}!`))
+app.listen(port)
