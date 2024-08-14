@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/push.js/0.0.11/push.min.js"></script>
+    <link rel="manifest" href="manifest.json">
     <title>Chat</title>
 </head>
+
 <body>
     <div id="top">
         <h1>Local Chat</h1>
@@ -18,43 +22,100 @@
                 <span class="material-symbols-outlined attach-icon">attach_file</span>
             </label>
             <input type="file" id="file-field" style="display:none;">
-            <input type="text" id="comment-field" placeholder="コメント...">
+            <textarea id="comment-field" placeholder="comment..."></textarea>
+            <!--<input type="textarea" id="comment-field" placeholder="comment...">-->
             <span class="material-symbols-outlined send-icon" id="send-button" onclick="sendComment();">send</span>
         </div>
     </div>
+    <script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(registration) {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, function(err) {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+    </script>
 </body>
 <script>
     const commentField = document.querySelector("#comment-field");
     const fileField = document.querySelector("#file-field");
     const commentSection = document.querySelector("#main");
-	 let username = ""
+    const commentFieldContainer = document.querySelector("#comment-field-container");
+    let username = ""
     let previousCommentCount = 0;
     let lastCommentUser = "";
-	 window.onload = function (){
-		 username = prompt("ユーザー名を入力してください")
-	 }
+    window.onload = async function () {
+        if (!localStorage.getItem('username')) {
+            username = prompt("ユーザー名を入力してください");
+            localStorage.setItem('username', username);
+        }
+        const comments = await (await fetch("/loadComments")).json();
+        commentSection.innerHTML = "";
+        for (const comment of comments) {
+                //const decodefilename = comment.file ? decodeURI(comment.file) : ""
+                //console.log(comment.file) 
+                const index = Array.prototype.indexOf.call(comments, comment)
+                commentSection.innerHTML += `
+	                <div class="comment">
+	                    <h3>${comment.user}</h3>
+	                    <p id="comment${Array.prototype.indexOf.call(comments, comment)}" >${comment.comment}</p>
+							  ${comment.file ? `<a href="${comment.file}" download class="file-link">Download File</a>` : ""}
+								<span class="material-symbols-outlined" id="edit-btn${index}" onclick="editComment(${index})">edit</span>
+								<span class="material-symbols-outlined" onclick="deleteComment(${index})">delete</span>
+	
+							  <span class="material-symbols-outlined copy-icon" id="btn_comment${index}" onclick="copyComment(${index})">content_copy</span>`
+        }
+        window.scrollTo(0, document.body.scrollHeight);
+        previousCommentCount = comments.length;
+    }
+    commentField.addEventListener("input", (event) => {
+        const PADDING_Y = 38; // テキストエリアのパディングの高さ
+        const MAX_LINES = 5;  // 最大行数
+
+        let lineHeight = 32;
+
+        // 入力された値の行数を計算
+        const lines = (commentField.value + '\n').match(/\n/g).length;
+        console.log(lines)
+
+        // 高さを再計算し、最大5行分まで拡張
+        const newHeight = Math.min(lineHeight * lines + PADDING_Y, lineHeight * MAX_LINES + PADDING_Y);
+        commentFieldContainer.style.height = newHeight + 'px';
+
+        // テキストエリアの高さをMAX_LINESで制限
+        if (lines < MAX_LINES) {
+            commentField.style.height = (lineHeight * lines) + 'px';
+        } else {
+            commentField.style.height = (lineHeight * MAX_LINES) + 'px';
+        }
+    });
+
+
     commentField.addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
+        if (event.key === "Enter" && event.ctrlKey) {
             sendComment();
         }
     });
-	const inputGroup = document.getElementById("input-group");
+    const inputGroup = document.getElementById("input-group");
 
-	commentField.addEventListener("focus", () => {
-		inputGroup.style.borderColor = "rgb(89, 205, 50)";
-	});
+    commentField.addEventListener("focus", () => {
+        inputGroup.style.borderColor = "rgb(89, 205, 50)";
+    });
 
-	commentField.addEventListener("blur", () => {
-		inputGroup.style.borderColor = "rgb(64, 64, 64)";
-	});
+    commentField.addEventListener("blur", () => {
+        inputGroup.style.borderColor = "rgb(64, 64, 64)";
+    });
 
-	 fileField.addEventListener("change", (event) => {
-		if (fileField.value !== ""){
-			document.getElementById("input-label").style.backgroundColor = "rgb(89, 205, 50)"
-		}else{
-			document.getElementById("input-label").style.backgroundColor = "rgb(64, 64, 64)"
-		} 
-	 })
+    fileField.addEventListener("change", (event) => {
+        if (fileField.value !== "") {
+            document.getElementById("input-label").style.backgroundColor = "rgb(89, 205, 50)"
+        } else {
+            document.getElementById("input-label").style.backgroundColor = "rgb(64, 64, 64)"
+        }
+    })
 
     function sendComment() {
         const comment = commentField.value;
@@ -65,13 +126,13 @@
         }
 
         const formData = new FormData();
-        formData.append("user", username);
+        formData.append("user", localStorage.getItem('username'));
         formData.append("comment", comment);
         if (file) {
-			  // エンコードしたファイル名を使用
-			  const encodedFileName = encodeURIComponent(file.name);
-			  formData.append("file", file, encodedFileName);
-		  }
+            // エンコードしたファイル名を使用
+            const encodedFileName = encodeURIComponent(file.name);
+            formData.append("file", file, encodedFileName);
+        }
 
         fetch("/addComment", {
             method: "POST",
@@ -80,26 +141,125 @@
             loadComments();
             commentField.value = "";
             fileField.value = ""; // Clear the file input
-			   document.getElementById("input-label").style.backgroundColor = "rgb(64, 64, 64)"
+            document.getElementById("input-label").style.backgroundColor = "rgb(64, 64, 64)"
+        });
+    }
+    function editComment(index) {
+        const commentText = document.getElementById(`comment${index}`);
+        const originalText = commentText.textContent;
+        console.log(document.getElementById(`edit-btn${index}`))
+        document.getElementById(`edit-btn${index}`).style.display = "none"
+        // 編集用のテキストフィールドと保存・キャンセルボタンを表示
+        commentText.innerHTML = `
+	        <textarea class="edit-field" id="edit-field${index}">${originalText}</textarea>
+			  <button onclick="saveComment(${index})" style="margin-left:-350px; background-color:rgb(233, 233, 233); border:0px; border-radius:50px; width:100px; height:40px;">Save</button> <button onclick="cancelEdit(${index}, '${originalText}')" style="color:rgb(233, 233, 233); background-color:rgb(64, 64, 64); border:0px; border-radius:50px; width:100px; height:40px;">Cancel</button>
+	    `;
+
+        // 元のテキストエリアの高さと同様に調整する
+        const editField = document.getElementById(`edit-field${index}`);
+        editField.style.height = commentField.style.height;
+    }
+
+
+    function saveComment(index) {
+        const newText = document.getElementById(`edit-field${index}`).value;
+
+        fetch("/editComment", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ index, newComment: newText }),
+        }).then(async () => {
+            const comments = await (await fetch("/loadComments")).json();
+            commentSection.innerHTML = "";
+            for (const comment of comments) {
+                //const decodefilename = comment.file ? decodeURI(comment.file) : ""
+                //console.log(comment.file) 
+                const index = Array.prototype.indexOf.call(comments, comment)
+                commentSection.innerHTML += `
+	                <div class="comment">
+	                    <h3>${comment.user}</h3>
+	                    <p id="comment${Array.prototype.indexOf.call(comments, comment)}" >${comment.comment}</p>
+							  ${comment.file ? `<a href="${comment.file}" download class="file-link">Download File</a>` : ""}
+								<span class="material-symbols-outlined" id="edit-btn${index}" onclick="editComment(${index})">edit</span>
+								<span class="material-symbols-outlined" onclick="deleteComment(${index})">delete</span>
+	
+							  <span class="material-symbols-outlined copy-icon" id="btn_comment${index}" onclick="copyComment(${index})">content_copy</span>`
+            }
+
+            previousCommentCount = comments.length;
         });
     }
 
-	function copyComment(num){
-		txt = document.getElementById(`comment${num}`)
-		navigator.clipboard.writeText(txt.textContent).then(
-	    () => {
-			 document.getElementById(`btn_comment${num}`).innerHTML = '<span class="material-symbols-outlined" id="btn_comment${num}">check</span>'
-	    },
-	    () => {
-	      alert('コピー失敗😭');
-	    });
-	}
+    function cancelEdit(index, originalText) {
+        document.getElementById(`edit-btn${index}`).style.display = "inline"
+        document.getElementById(`comment${index}`).innerHTML = originalText;
+    }
+
+    function deleteComment(index) {
+        if (confirm("本当にこのコメントを削除しますか？")) {
+            fetch("/deleteComment", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ index }),
+            }).then(async () => {
+                const comments = await (await fetch("/loadComments")).json();
+                commentSection.innerHTML = "";
+                for (const comment of comments) {
+                    //const decodefilename = comment.file ? decodeURI(comment.file) : ""
+                    //console.log(comment.file) 
+                    const index = Array.prototype.indexOf.call(comments, comment)
+                    commentSection.innerHTML += `
+                        <div class="comment">
+                            <h3>${comment.user}</h3>
+                            <p id="comment${Array.prototype.indexOf.call(comments, comment)}" >${comment.comment}</p>
+                                ${comment.file ? `<a href="${comment.file}" download class="file-link">Download File</a>` : ""}
+                                    <span class="material-symbols-outlined" id="edit-btn${index}" onclick="editComment(${index})">edit</span>
+                                    <span class="material-symbols-outlined" onclick="deleteComment(${index})">delete</span>
+        
+                                <span class="material-symbols-outlined copy-icon" id="btn_comment${index}" onclick="copyComment(${index})">content_copy</span>`
+                }
+
+                previousCommentCount = comments.length;
+            });
+        }
+    }
+
+
+    function copyComment(num) {
+        txt = document.getElementById(`comment${num}`)
+        navigator.clipboard.writeText(txt.textContent).then(
+            () => {
+                document.getElementById(`btn_comment${num}`).innerHTML = '<span class="material-symbols-outlined" id="btn_comment${num}">check</span>'
+                setTimeout(()=>{document.getElementById(`btn_comment${num}`).innerHTML = '<span class="material-symbols-outlined" id="btn_comment${num}">content_copy</span>'},1500)
+            },
+            () => {
+                alert('コピー失敗');
+            });
+    }
 
     async function loadComments() {
         const comments = await (await fetch("/loadComments")).json();
-        commentSection.innerHTML = "";
+
 
         if (comments.length > previousCommentCount && comments[comments.length - 1].user !== lastCommentUser && comments.length > 1) {
+            commentSection.innerHTML = "";
+            for (const comment of comments) {
+                const index = Array.prototype.indexOf.call(comments, comment)
+                commentSection.innerHTML += `
+	                <div class="comment">
+	                    <h3>${comment.user}</h3>
+	                    <p id="comment${Array.prototype.indexOf.call(comments, comment)}" >${comment.comment}</p>
+							  ${comment.file ? `<a href="${comment.file}" download class="file-link">Download File</a>` : ""}
+								<span class="material-symbols-outlined" id="edit-btn${index}" onclick="editComment(${index})">edit</span>
+								<span class="material-symbols-outlined" onclick="deleteComment(${index})">delete</span>
+	
+							  <span class="material-symbols-outlined copy-icon" id="btn_comment${index}" onclick="copyComment(${index})">content_copy</span>`
+            }
+
             const latestComment = comments[comments.length - 1];
             Push.create(latestComment.user + " says:", {
                 body: latestComment.comment,
@@ -107,19 +267,6 @@
                 timeout: 4000
             });
         }
-
-         for (const comment of comments) {
-			  //const decodefilename = comment.file ? decodeURI(comment.file) : ""
-           //console.log(comment.file) 
-			  commentSection.innerHTML += `
-                <div class="comment">
-                    <h3>${comment.user}</h3>
-                    <p id="comment${Array.prototype.indexOf.call(comments,comment)}" >${comment.comment}</p>
-						  <span class="material-symbols-outlined copy-icon" id="btn_comment${Array.prototype.indexOf.call(comments,comment)}" onclick="copyComment(${Array.prototype.indexOf.call(comments,comment)})">content_copy</span>
-                    ${comment.file ? `<a href="${comment.file}" download class="file-link">Download File</a>`: ""}
-                </div>`;
-        }
-
         previousCommentCount = comments.length;
     }
 
@@ -127,6 +274,7 @@
 </script>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono&family=Roboto+Mono:wght@400;424&display=swap');
+
     body {
         --primaryColor: rgb(43, 43, 43);
         --primaryColorLight: rgb(64, 64, 64);
@@ -144,7 +292,14 @@
         background-color: var(--primaryColor);
     }
 
+    p {
+        white-space: pre-wrap;
+        /* 改行やスペースをそのまま表示 */
+        text-align: left
+    }
+
     #comment-field {
+        resize: none;
         outline: none;
         border-radius: 20px;
         border: 2px solid transparent;
@@ -154,10 +309,11 @@
         padding: 15px;
         padding-left: 20px;
         color: var(--primaryComplimentary);
-        font-size: 1.5rem;
+        font-size: 24px;
         font-family: 'Roboto Mono', monospace;
         border-left: none;
         border-radius: 0 20px 20px 0;
+        overflow-y: auto;
     }
 
     /*#comment-field:focus{
@@ -173,10 +329,31 @@
         background-color: var(--primaryColorDark);
     }
 
+    .edit-field {
+        resize: none;
+        outline: none;
+        border: 2px solid transparent;
+        background: transparent;
+        height: 40px;
+        width: 80%;
+        padding: 15px;
+        color: var(--primaryComplimentary);
+        font-size: 24px;
+        font-family: 'Roboto Mono', monospace;
+        border-left: none;
+        overflow-y: auto;
+        background-color: var(--primaryColorDark);
+        /* 背景色を追加 */
+        border: 2px solid var(--primaryColorLight);
+        /* 枠線を追加 */
+    }
+
+
+
     .input-label {
         display: flex;
         align-items: center;
-		  height:100%;
+        height: 100%;
         padding: 0 10px;
         border-radius: 17px 0 0 17px;
         background-color: var(--primaryColorLight);
@@ -188,7 +365,7 @@
         cursor: pointer;
     }
 
-	 .copy-icon {
+    .copy-icon {
         cursor: pointer;
     }
 
@@ -197,6 +374,7 @@
         font-size: 2rem;
         transition: color 0.125s;
         cursor: pointer;
+        margin-right: 10px;
     }
 
     .send-icon:hover {
@@ -256,4 +434,5 @@
         color: var(--accentColorLight);
     }
 </style>
+
 </html>
