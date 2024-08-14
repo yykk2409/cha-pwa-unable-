@@ -51,6 +51,10 @@ app.get("/sw.js", (req, resp) => {
     resp.status(200).send(readFileSync("./sw.js", { encoding: "utf-8" }));
 });
 
+app.get("/manifest.json", (req, resp) => {
+    resp.status(200).send(readFileSync("./manifest.json", { encoding: "utf-8" }));
+});
+
 app.post("/addComment", upload.single('file'), (req, resp) => {
     const newComment = {
         user: req.body.user,
