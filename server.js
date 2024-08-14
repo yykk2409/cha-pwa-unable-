@@ -48,7 +48,9 @@ app.get("/", (req, resp) => {
 });
 
 app.get("/sw.js", (req, resp) => {
-    resp.status(200).send(readFileSync("./sw.js", { encoding: "utf-8" }));
+    resp.status(200)
+        .set("Content-Type", "application/javascript")  // MIME タイプを指定
+        .send(readFileSync("./sw.js", { encoding: "utf-8" }));
 });
 
 app.get("/manifest.json", (req, resp) => {
